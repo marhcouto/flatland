@@ -6,6 +6,7 @@ project(flatland_plugins)
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
 endif()
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -61,6 +62,7 @@ add_library(flatland_plugins_lib SHARED
   src/laser.cpp
   src/tricycle_drive.cpp
   src/diff_drive.cpp
+  src/dynamics_limits.cpp
   src/model_tf_publisher.cpp
   src/update_timer.cpp
   src/bumper.cpp
@@ -130,6 +132,9 @@ install(
 # catkin_add_nosetests(test)
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(dynamics_limits_test test/dynamics_limits_test.cpp)
+  target_link_libraries(dynamics_limits_test flatland_plugins_lib)
 
   ament_add_gtest(diff_drive_test test/diff_drive_test.cpp)
   target_link_libraries(diff_drive_test flatland_plugins_lib)

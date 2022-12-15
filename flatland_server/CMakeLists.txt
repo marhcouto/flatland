@@ -11,7 +11,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-## Find macros and libraries
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
+
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 
@@ -126,6 +127,10 @@ ament_export_libraries(flatland_lib)
 ament_export_dependencies(rclcpp flatland_box2d flatland_msgs yaml_cpp_vendor pluginlib geometry_msgs std_srvs tf2 tf2_ros tf2_geometry_msgs)
 ament_export_include_directories(include)
 
+
+install(PROGRAMS scripts/map_to_lines.py
+    DESTINATION bin
+)
 
 #############
 ## Testing ##

@@ -69,6 +69,8 @@ void DiffDrive::OnInitialize(const YAML::Node& config) {
   enable_twist_pub_ = reader.Get<bool>("enable_twist_pub", true);
   std::string body_name = reader.Get<std::string>("body");
   std::string odom_frame_id = reader.Get<std::string>("odom_frame_id", "odom");
+  std::string ground_truth_frame_id =
+      reader.Get<std::string>("ground_truth_frame_id", odom_frame_id);
 
   std::string twist_topic = reader.Get<std::string>("twist_sub", "cmd_vel");
   std::string odom_topic =
@@ -86,6 +88,12 @@ void DiffDrive::OnInitialize(const YAML::Node& config) {
   double pub_rate =
       reader.Get<double>("pub_rate", std::numeric_limits<double>::infinity());
   update_timer_.SetRate(pub_rate);
+
+  // Angular dynamics constraints
+  angular_dynamics_.Configure(reader.SubnodeOpt("angular_dynamics", YamlReader::MAP).Node());
+
+  // Linear dynamics constraints
+  linear_dynamics_.Configure(reader.SubnodeOpt("linear_dynamics", YamlReader::MAP).Node());
 
   // by default the covariance diagonal is the variance of actual noise
   // generated, non-diagonal elements are zero assuming the noises are
@@ -127,11 +135,15 @@ void DiffDrive::OnInitialize(const YAML::Node& config) {
   }
 
   // init the values for the messages
-  ground_truth_msg_.header.frame_id = odom_frame_id;
-  ground_truth_msg_.child_frame_id = GetModel()->NameSpaceTF(body_->name_);
+  ground_truth_msg_.header.frame_id = ground_truth_frame_id;
+  ground_truth_msg_.child_frame_id =
+      tf2::resolve("", GetModel()->NameSpaceTF(body_->name_));
   ground_truth_msg_.twist.covariance.fill(0);
   ground_truth_msg_.pose.covariance.fill(0);
+  // Odometry message initially is similar to ground truth except for the
+  // parent frame ID
   odom_msg_ = ground_truth_msg_;
+  odom_msg_.header.frame_id = odom_frame_id;
 
   // copy from std::array to boost array
   for (unsigned int i = 0; i < 36; i++) {
@@ -172,6 +184,34 @@ void DiffDrive::BeforePhysicsStep(const Timekeeper& timekeeper) {
 
   b2Vec2 position = b2body->GetPosition();
   float angle = b2body->GetAngle();
+
+  // Apply dynamics limits
+  double dt = timekeeper.GetStepSize();
+  linear_velocity_ = linear_dynamics_.Limit(linear_velocity_, twist_msg_->linear.x, dt);
+  angular_velocity_ = angular_dynamics_.Limit(angular_velocity_, twist_msg_->angular.z, dt);
+
+  // we apply the twist velocities, this must be done every physics step to make
+  // sure Box2D solver applies the correct velocity through out. The velocity
+  // given in the twist message should be in the local frame
+  b2Vec2 linear_vel_local(linear_velocity_, 0);
+  b2Vec2 linear_vel = b2body->GetWorldVector(linear_vel_local);
+  float angular_vel = angular_velocity_;  // angular is independent of frames
+
+  // we want the velocity vector in the world frame at the center of mass
+
+  // V_cm = V_o + W x r_cm/o
+  // velocity at center of mass equals to the velocity at the body origin plus,
+  // angular velocity cross product the displacement from the body origin to the
+  // center of mass
+
+  // r is the vector from body origin to the CM in world frame
+  b2Vec2 r = b2body->GetWorldCenter() - position;
+  b2Vec2 linear_vel_cm = linear_vel + angular_vel * b2Vec2(-r.y, r.x);
+
+  b2body->SetLinearVelocity(linear_vel_cm);
+  b2body->SetAngularVelocity(angular_vel);
+
+  // Update odom+ground truth messages if needed
 
   if (publish) {
     // get the state of the body and publish the data
@@ -238,27 +278,6 @@ void DiffDrive::BeforePhysicsStep(const Timekeeper& timekeeper) {
     odom_tf.transform.rotation = odom_msg_.pose.pose.orientation;
     tf_broadcaster_->sendTransform(odom_tf);
   }
-
-  // we apply the twist velocities, this must be done every physics step to make
-  // sure Box2D solver applies the correct velocity through out. The velocity
-  // given in the twist message should be in the local frame
-  b2Vec2 linear_vel_local(twist_msg_->linear.x, 0);
-  b2Vec2 linear_vel = b2body->GetWorldVector(linear_vel_local);
-  float angular_vel = twist_msg_->angular.z;  // angular is independent of frames
-
-  // we want the velocity vector in the world frame at the center of mass
-
-  // V_cm = V_o + W x r_cm/o
-  // velocity at center of mass equals to the velocity at the body origin plus,
-  // angular velocity cross product the displacement from the body origin to the
-  // center of mass
-
-  // r is the vector from body origin to the CM in world frame
-  b2Vec2 r = b2body->GetWorldCenter() - position;
-  b2Vec2 linear_vel_cm = linear_vel + angular_vel * b2Vec2(-r.y, r.x);
-
-  b2body->SetLinearVelocity(linear_vel_cm);
-  b2body->SetAngularVelocity(angular_vel);
 }
 }
 
