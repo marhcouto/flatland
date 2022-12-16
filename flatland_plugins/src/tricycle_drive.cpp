@@ -105,7 +105,7 @@ void TricycleDrive::OnInitialize(const YAML::Node& config) {
   max_steer_angle_ = r.Get<double>("max_steer_angle", 0.0);
 
   // Angular dynamics constraints
-  angular_dynamics_.Configure(r.SubnodeOpt("angular_dynamics", YamlReader::MAP).Node());
+  angular_dynamics_.Configure(node_, r.SubnodeOpt("angular_dynamics", YamlReader::MAP).Node());
 
   // Accept old configuration location for angular dynamics constraints if present
   if (angular_dynamics_.velocity_limit_ == 0.0) angular_dynamics_.velocity_limit_ = r.Get<double>("max_angular_velocity", 0.0);
@@ -115,7 +115,7 @@ void TricycleDrive::OnInitialize(const YAML::Node& config) {
   }
 
   // Linear dynamics constraints
-  linear_dynamics_.Configure(r.SubnodeOpt("linear_dynamics", YamlReader::MAP).Node());
+  linear_dynamics_.Configure(node_, r.SubnodeOpt("linear_dynamics", YamlReader::MAP).Node());
 
   delta_command_ = 0.0;
   theta_f_ = 0.0;

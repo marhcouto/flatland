@@ -50,6 +50,7 @@
 
 #include <flatland_server/yaml_reader.h>
 #include <yaml-cpp/yaml.h>
+#include <rclcpp/rclcpp.hpp>
 
 namespace flatland_plugins {
 
@@ -67,14 +68,14 @@ class DynamicsLimits {
   /**
    * @brief               blank constructor, no-op class
    */
-  DynamicsLimits() {};
+  DynamicsLimits() {}
 
   /**
    * @name         Load configuration from a yaml object
    * @brief        Constructor from yaml configuration file node
    * @param[in]    YAML::Node& configuration node
    */
-   void Configure(const YAML::Node &config);
+   void Configure(rclcpp::Node::SharedPtr node, const YAML::Node &config);
 
   /**
    * @name          Saturate

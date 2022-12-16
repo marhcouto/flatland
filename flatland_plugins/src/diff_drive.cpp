@@ -46,13 +46,11 @@
 
 #include <Box2D/Box2D.h>
 #include <flatland_plugins/diff_drive.h>
-#include <flatland_server/debug_visualization.h>
 #include <flatland_server/model_plugin.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <pluginlib/class_list_macros.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <tf2/convert.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 namespace flatland_plugins {
@@ -90,10 +88,10 @@ void DiffDrive::OnInitialize(const YAML::Node& config) {
   update_timer_.SetRate(pub_rate);
 
   // Angular dynamics constraints
-  angular_dynamics_.Configure(reader.SubnodeOpt("angular_dynamics", YamlReader::MAP).Node());
+  angular_dynamics_.Configure(node_, reader.SubnodeOpt("angular_dynamics", YamlReader::MAP).Node());
 
   // Linear dynamics constraints
-  linear_dynamics_.Configure(reader.SubnodeOpt("linear_dynamics", YamlReader::MAP).Node());
+  linear_dynamics_.Configure(node_, reader.SubnodeOpt("linear_dynamics", YamlReader::MAP).Node());
 
   // by default the covariance diagonal is the variance of actual noise
   // generated, non-diagonal elements are zero assuming the noises are
@@ -136,8 +134,9 @@ void DiffDrive::OnInitialize(const YAML::Node& config) {
 
   // init the values for the messages
   ground_truth_msg_.header.frame_id = ground_truth_frame_id;
-  ground_truth_msg_.child_frame_id =
-      tf2::resolve("", GetModel()->NameSpaceTF(body_->name_));
+  //ground_truth_msg_.child_frame_id =
+  //    tf2::resolve("", GetModel()->NameSpaceTF(body_->name_));
+  ground_truth_msg_.child_frame_id = GetModel()->NameSpaceTF(body_->name_);
   ground_truth_msg_.twist.covariance.fill(0);
   ground_truth_msg_.pose.covariance.fill(0);
   // Odometry message initially is similar to ground truth except for the
