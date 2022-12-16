@@ -48,6 +48,7 @@
 #include <flatland_server/yaml_reader.h>
 #include <yaml-cpp/yaml.h>
 #include <gtest/gtest.h>
+#include <rclcpp/rclcpp.hpp>
 
 using namespace flatland_plugins;
 
@@ -70,7 +71,9 @@ TEST(DynamicsLimitsTest, test_Configure_blank) {
 TEST(DynamicsLimitsTest, test_Configure_empty_yaml) {
   auto dynamics_limits = DynamicsLimits();
   YAML::Node config = YAML::Node();
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_emptyTest");
+  dynamics_limits.Configure(node, config);
 
   // Ensure defaults are zero
   EXPECT_NEAR(0.0, dynamics_limits.acceleration_limit_, 1e-3);
@@ -88,7 +91,9 @@ TEST(DynamicsLimitsTest, test_Configure_two_params) {
   YAML::Node config = YAML::Node();
   config["acceleration_limit"] = 0.1;
   config["velocity_limit"] = 2.0;
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_twoParamsTest");
+  dynamics_limits.Configure(node, config);
 
   // Ensure defaults are zero
   EXPECT_NEAR(0.1, dynamics_limits.acceleration_limit_, 1e-3);
@@ -107,7 +112,9 @@ TEST(DynamicsLimitsTest, test_Configure_three_params) {
   config["acceleration_limit"] = 0.1;
   config["deceleration_limit"] = 0.2;
   config["velocity_limit"] = 2.0;
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_threeParamsTest");
+  dynamics_limits.Configure(node, config);
 
   // Ensure params are correct
   EXPECT_NEAR(0.1, dynamics_limits.acceleration_limit_, 1e-3);
@@ -147,7 +154,9 @@ TEST(DynamicsLimitsTest, test_Limit_velocity) {
 
   YAML::Node config = YAML::Node();
   config["velocity_limit"] = 1.0;
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_limitVelocityTest");
+  dynamics_limits.Configure(node, config);
 
   EXPECT_NEAR(0.0, dynamics_limits.acceleration_limit_, 1e-3);
   EXPECT_NEAR(0.0, dynamics_limits.deceleration_limit_, 1e-3);
@@ -181,7 +190,9 @@ TEST(DynamicsLimitsTest, test_Limit_acceleration) {
 
   YAML::Node config = YAML::Node();
   config["acceleration_limit"] = 9.0;
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_limitAccelerationTest");
+  dynamics_limits.Configure(node, config);
 
   EXPECT_NEAR(9.0, dynamics_limits.acceleration_limit_, 1e-3);
   EXPECT_NEAR(9.0, dynamics_limits.deceleration_limit_, 1e-3);
@@ -247,7 +258,9 @@ TEST(DynamicsLimitsTest, test_Limit_deceleration) {
   YAML::Node config = YAML::Node();
   config["acceleration_limit"] = 1.0;
   config["deceleration_limit"] = 9.0;
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_limitDecelerationTest");
+  dynamics_limits.Configure(node, config);
 
   EXPECT_NEAR(1.0, dynamics_limits.acceleration_limit_, 1e-3);
   EXPECT_NEAR(9.0, dynamics_limits.deceleration_limit_, 1e-3);
@@ -283,7 +296,9 @@ TEST(DynamicsLimitsTest, test_Limit_zero_crossing) {
   YAML::Node config = YAML::Node();
   config["acceleration_limit"] = 1.0;
   config["deceleration_limit"] = 2.0;
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_limitZeroCrossingTest");
+  dynamics_limits.Configure(node, config);
 
   EXPECT_NEAR(1.0, dynamics_limits.acceleration_limit_, 1e-3);
   EXPECT_NEAR(2.0, dynamics_limits.deceleration_limit_, 1e-3);
@@ -310,7 +325,9 @@ TEST(DynamicsLimitsTest, test_Limit_zero_crossing_corner_case1) {
   YAML::Node config = YAML::Node();
   config["acceleration_limit"] = 0.0;
   config["deceleration_limit"] = 2.0;
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_limitZeroCrossingCornerCase1Test");
+  dynamics_limits.Configure(node, config);
 
   EXPECT_NEAR(0.0, dynamics_limits.acceleration_limit_, 1e-3);
   EXPECT_NEAR(2.0, dynamics_limits.deceleration_limit_, 1e-3);
@@ -334,7 +351,9 @@ TEST(DynamicsLimitsTest, test_Limit_zero_crossing_corner_case2) {
   YAML::Node config = YAML::Node();
   config["acceleration_limit"] = 2.0;
   config["deceleration_limit"] = 0.0;
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_limitZeroCrossingCornerCase2Test");
+  dynamics_limits.Configure(node, config);
 
   EXPECT_NEAR(2.0, dynamics_limits.acceleration_limit_, 1e-3);
   EXPECT_NEAR(0.0, dynamics_limits.deceleration_limit_, 1e-3);
@@ -360,7 +379,9 @@ TEST(DynamicsLimitsTest, test_Limit_acceleration_and_velocity) {
   config["acceleration_limit"] = 1.0;
   config["deceleration_limit"] = 9.0;
   config["velocity_limit"] = 0.5;
-  dynamics_limits.Configure(config);
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_dynamic_limits_plugin_limitAccVelTest");
+  dynamics_limits.Configure(node, config);
 
   EXPECT_NEAR(1.0, dynamics_limits.acceleration_limit_, 1e-3);
   EXPECT_NEAR(9.0, dynamics_limits.deceleration_limit_, 1e-3);
@@ -387,6 +408,7 @@ TEST(DynamicsLimitsTest, test_Limit_acceleration_and_velocity) {
 
 // Run all the tests that were declared with TEST()
 int main(int argc, char** argv) {
+  rclcpp::init(argc, argv);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
