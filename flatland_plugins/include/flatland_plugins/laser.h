@@ -48,11 +48,11 @@
 #include <flatland_server/model_plugin.h>
 #include <flatland_server/timekeeper.h>
 #include <flatland_server/types.h>
-#include <ros/ros.h>
-#include <sensor_msgs/LaserScan.h>
-#include <tf/transform_broadcaster.h>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <tf2_ros/transform_broadcaster.h>
 #include <thirdparty/ThreadPool.h>
-#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/msg/marker.hpp>
 #include <Eigen/Dense>
 #include <random>
 #include <thread>
@@ -94,27 +94,27 @@ class Laser : public ModelPlugin {
   std::default_random_engine rng_;             ///< random generator
   std::normal_distribution<float> noise_gen_;  ///< gaussian noise generator
 
-  Eigen::Matrix3f m_body_to_laser_;        ///< tf from body to laser
-  Eigen::Matrix3f m_world_to_body_;        ///< tf  from world to body
-  Eigen::Matrix3f m_world_to_laser_;       ///< tf from world to laser
-  Eigen::MatrixXf m_laser_points_;         ///< laser points in the laser' frame
-  Eigen::MatrixXf m_world_laser_points_;   /// laser point in the world frame
-  Eigen::Vector3f v_zero_point_;           ///< point representing (0,0)
-  Eigen::Vector3f v_world_laser_origin_;   ///< (0,0) in the laser frame
-  sensor_msgs::LaserScan laser_scan_;      ///< for publishing laser scan
+  Eigen::Matrix3f m_body_to_laser_;       ///< tf from body to laser
+  Eigen::Matrix3f m_world_to_body_;       ///< tf  from world to body
+  Eigen::Matrix3f m_world_to_laser_;      ///< tf from world to laser
+  Eigen::MatrixXf m_laser_points_;        ///< laser points in the laser' frame
+  Eigen::MatrixXf m_world_laser_points_;  /// laser point in the world frame
+  Eigen::Vector3f v_zero_point_;          ///< point representing (0,0)
+  Eigen::Vector3f v_world_laser_origin_;  ///< (0,0) in the laser frame
+  sensor_msgs::msg::LaserScan laser_scan_;     ///< for publishing laser scan
   std::vector<float> m_lastMaxFractions_;  ///< the robot move slowly when
                                            /// comparing with to the scan rate
 
-  ros::Publisher scan_publisher_;             ///< ros laser topic publisher
-  tf::TransformBroadcaster tf_broadcaster_;   ///< broadcast laser frame
-  geometry_msgs::TransformStamped laser_tf_;  ///< tf from body to laser frame
+  rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr scan_publisher_;             ///< ros laser topic publisher
+  std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;   ///< broadcast laser frame
+  geometry_msgs::msg::TransformStamped laser_tf_;  ///< tf from body to laser frame
   UpdateTimer update_timer_;                  ///< for controlling update rate
 
   /**
    * @brief Constructor to start the threadpool with N+1 threads
    */
   Laser() : pool_(std::thread::hardware_concurrency() + 1) {
-    ROS_INFO_STREAM("Laser plugin loaded with "
+    RCLCPP_INFO_STREAM(rclcpp::get_logger("Laser Plugin"), "Laser plugin loaded with "
                     << (std::thread::hardware_concurrency() + 1) << " threads");
   };
 
@@ -169,6 +169,6 @@ class LaserCallback : public b2RayCastCallback {
   float ReportFixture(b2Fixture *fixture, const b2Vec2 &point,
                       const b2Vec2 &normal, float fraction) override;
 };
-};
+}
 
 #endif

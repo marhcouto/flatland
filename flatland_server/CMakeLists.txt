@@ -1,39 +1,37 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
+
 project(flatland_server)
 
-# Ensure we're using c++11
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
-## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
-  rostest
-  pluginlib
-  roscpp
-  std_msgs
-  tf2
-  tf2_geometry_msgs
-  geometry_msgs
-  visualization_msgs
-  interactive_markers
-  flatland_msgs
-)
 
-## System dependencies are found with CMake's conventions
-find_package(PkgConfig REQUIRED)
+find_package(ament_cmake REQUIRED)
 
-# yaml-cpp
-pkg_check_modules(YAML_CPP REQUIRED yaml-cpp)
-find_path(YAML_CPP_INCLUDE_DIR
-          NAMES yaml_cpp.h
-          PATHS ${YAML_CPP_INCLUDE_DIRS})
-find_library(YAML_CPP_LIBRARY
-             NAMES YAML_CPP
-             PATHS ${YAML_CPP_LIBRARY_DIRS})
-link_directories(${YAML_CPP_LIBRARY_DIRS})
+find_package(pluginlib REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(interactive_markers REQUIRED)
+find_package(flatland_msgs REQUIRED)
+find_package(yaml_cpp_vendor REQUIRED)
+find_package(flatland_box2d REQUIRED)
 
 # lua5.1
 find_package(Lua 5.1 QUIET)
@@ -42,48 +40,27 @@ find_package(Lua 5.1 QUIET)
 find_package(OpenCV REQUIRED)
 
 # Boost
-find_package(Boost REQUIRED COMPONENTS date_time system thread)
+find_package(Boost REQUIRED COMPONENTS date_time system filesystem)
 find_package(Threads)
 
 ##############
 ## coverage ##
 ##############
 
-set(COVERAGE "OFF" CACHE STRING "Enable coverage generation.")
+#set(COVERAGE "OFF" CACHE STRING "Enable coverage generation.")
 
-message(STATUS "Using COVERAGE: ${COVERAGE}")
-if("${COVERAGE}" STREQUAL "ON")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage")
-endif()
+#message(STATUS "Using COVERAGE: ${COVERAGE}")
+#if("${COVERAGE}" STREQUAL "ON")
+#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage")
+#endif()
 
-###################################
-## catkin specific configuration ##
-###################################
-catkin_package(
-  INCLUDE_DIRS include thirdparty
-  LIBRARIES flatland_lib flatland_Box2D
-  CATKIN_DEPENDS pluginlib roscpp std_msgs tf2 visualization_msgs tf2_geometry_msgs geometry_msgs
-  DEPENDS OpenCV YAML_CPP
-)
 
 ###########
 ## Build ##
 ###########
 
-include_directories(
-  thirdparty
-  include
-  ${catkin_INCLUDE_DIRS}
-  ${YAML_CPP_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
-  ${Boost_INCLUDE_DIRS}
-  ${LUA_INCLUDE_DIR}
-)
-
-add_subdirectory("thirdparty/Box2D")
-
 ## Flatland server library
-add_library(flatland_lib
+add_library(flatland_lib SHARED
   src/simulation_manager.cpp
   src/world.cpp
   src/layer.cpp
@@ -107,143 +84,130 @@ add_library(flatland_lib
   src/yaml_preprocessor.cpp
 )
 
-add_dependencies(flatland_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_include_directories(flatland_lib
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    ${LUA_INCLUDE_DIR})
+
+ament_target_dependencies(flatland_lib flatland_box2d rclcpp flatland_msgs yaml_cpp_vendor pluginlib geometry_msgs std_srvs tf2 tf2_ros tf2_geometry_msgs visualization_msgs interactive_markers sensor_msgs)
+
 target_link_libraries(flatland_lib
-  ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${Boost_LIBRARIES}
+  ${Boost_FILESYSTEM_LIBRARY}
   ${LUA_LIBRARIES}
-  flatland_Box2D
   yaml-cpp
 )
 
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-# add_dependencies(flatland_server_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
 ## Declare a C++ executable
 add_executable(flatland_server src/flatland_server_node.cpp)
-add_dependencies(flatland_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+ament_target_dependencies(flatland_server flatland_box2d rclcpp flatland_msgs yaml_cpp_vendor pluginlib geometry_msgs std_srvs tf2 tf2_ros tf2_geometry_msgs visualization_msgs interactive_markers)
+
+target_include_directories(flatland_server
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    ${LUA_INCLUDE_DIR}
+    ${yaml_cpp_vendor_INCLUDE_DIRS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(flatland_server
-  ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${Boost_LIBRARIES}
+  ${Boost_FILESYSTEM_LIBRARY}
   ${LUA_LIBRARIES}
-  flatland_Box2D
   yaml-cpp
   flatland_lib
 )
 
-#############
-## Install ##
-#############
 
-# all install targets should use catkin DESTINATION variables
-# See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
+ament_export_targets(export_flatland_lib HAS_LIBRARY_TARGET)
+ament_export_libraries(flatland_lib)
+ament_export_dependencies(rclcpp flatland_box2d flatland_msgs yaml_cpp_vendor pluginlib geometry_msgs std_srvs tf2 tf2_ros tf2_geometry_msgs)
+ament_export_include_directories(include)
 
-## Mark executable scripts (Python etc.) for installation
-## in contrast to setup.py, you can choose the destination
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
-
-# Mark executables and/or libraries for installation
-install(TARGETS flatland_server flatland_lib
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-# Mark cpp header files for installation
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
-)
-
-# Install launchfiles
-install(DIRECTORY launch
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
-
-install(DIRECTORY test/conestogo_office_test
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/test
-)
-
-# Install plugins file
-install(FILES flatland_plugins.xml
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
 
 install(PROGRAMS scripts/map_to_lines.py
-    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+    DESTINATION bin
 )
 
 #############
 ## Testing ##
 #############
 
-if(CATKIN_ENABLE_TESTING)
+if(BUILD_TESTING)
 
-  catkin_add_gtest(null_test test/null.cpp)
+  # Include linting tests
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+
+  ament_add_gtest(${PROJECT_NAME}_null_test test/null.cpp)
   
-  add_rostest_gtest(load_world_test
-    test/load_world_test.test
-    test/load_world_test.cpp)
-  target_link_libraries(load_world_test
-    flatland_lib)
+  ament_add_gtest(load_world_test test/load_world_test.cpp)
+  target_link_libraries(load_world_test flatland_lib)
 
-  add_rostest_gtest(model_test test/model_test.test test/model_test.cpp)
+  ament_add_gtest(model_test test/model_test.cpp)
   target_link_libraries(model_test flatland_lib)
 
-  catkin_add_gtest(geometry_test test/geometry_test.cpp)
-  target_link_libraries(geometry_test
-    flatland_lib)
+  ament_add_gtest(geometry_test test/geometry_test.cpp)
+  target_link_libraries(geometry_test flatland_lib)
 
-  catkin_add_gtest(collision_filter_registry_test
-    test/collision_filter_registry_test.cpp)
-  target_link_libraries(collision_filter_registry_test
-    flatland_lib)
+  ament_add_gtest(collision_filter_registry_test test/collision_filter_registry_test.cpp)
+  target_link_libraries(collision_filter_registry_test flatland_lib)
 
-  add_rostest_gtest(plugin_manager_test
-    test/plugin_manager_test.test
-    test/plugin_manager_test.cpp)
-  target_link_libraries(plugin_manager_test
-    flatland_lib)
+  ament_add_gtest(plugin_manager_test test/plugin_manager_test.cpp)
+  target_link_libraries(plugin_manager_test flatland_lib)
 
-  add_rostest_gtest(service_manager_test
-    test/service_manager_test.test
-    test/service_manager_test.cpp)
-  target_link_libraries(service_manager_test
-    flatland_lib)
+  ament_add_gtest(yaml_preprocessor_test test/yaml_preprocessor/yaml_preprocessor_test.cpp)
+  target_link_libraries(yaml_preprocessor_test flatland_lib yaml-cpp)
 
+  ament_add_gtest(dummy_world_plugin_test test/dummy_world_plugin_test.cpp)
+  target_link_libraries(dummy_world_plugin_test flatland_lib yaml-cpp)
 
-  add_rostest_gtest(debug_visualization_test
-    test/debug_visualization.test
-    test/debug_visualization_test.cpp)
-  target_link_libraries(debug_visualization_test
-    flatland_lib)
+  ament_add_gtest(dummy_model_plugin_test test/dummy_model_plugin_test.cpp)
+  target_link_libraries(dummy_model_plugin_test flatland_lib)
 
-  add_rostest_gtest(dummy_model_plugin_test 
-                    test/dummy_model_plugin_test.test 
-                    test/dummy_model_plugin_test.cpp) 
-  target_link_libraries(dummy_model_plugin_test
-                        flatland_lib) 
-                        
-  add_rostest_gtest(dummy_world_plugin_test 
-                    test/dummy_world_plugin_test.test 
-                    test/dummy_world_plugin_test.cpp) 
-  target_link_libraries(dummy_world_plugin_test
-                        flatland_lib yaml-cpp) 
+  ament_add_gtest(service_manager_test test/service_manager_test.cpp)
+  target_link_libraries(service_manager_test flatland_lib)
 
-  add_rostest_gtest(yaml_preprocessor_test
-                    test/yaml_preprocessor/yaml_preprocessor_test.test 
-                    test/yaml_preprocessor/yaml_preprocessor_test.cpp) 
-  target_link_libraries(yaml_preprocessor_test
-                        flatland_lib yaml-cpp)
-
-
+  ament_add_gtest(debug_visualization_test test/debug_visualization_test.cpp)
+  target_link_libraries(debug_visualization_test flatland_lib)
 endif()
+
+#############
+## Install ##
+#############
+
+pluginlib_export_plugin_description_file(flatland_server plugin_description.xml)
+
+install(
+  TARGETS flatland_lib
+  EXPORT export_flatland_lib
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
+
+# Mark executables and/or libraries for installation
+install(TARGETS flatland_server
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Mark cpp header files for installation
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
+# Install launchfiles
+install(DIRECTORY launch
+    DESTINATION share/${PROJECT_NAME}/
+)
+
+install(DIRECTORY test/conestogo_office_test
+    DESTINATION share/${PROJECT_NAME}/test
+)
+
+ament_package()

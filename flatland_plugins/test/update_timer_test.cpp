@@ -49,23 +49,25 @@
 #include <flatland_server/timekeeper.h>
 #include <flatland_server/world.h>
 #include <gtest/gtest.h>
+
 #include <regex>
 
 namespace fs = boost::filesystem;
 using namespace flatland_server;
 using namespace flatland_plugins;
+using namespace std::chrono_literals;
 
 class TestPlugin : public ModelPlugin {
  public:
   UpdateTimer update_timer_;
   int update_counter_;
 
-  void OnInitialize(const YAML::Node& config) override {
+  void OnInitialize(const YAML::Node &config) override {
     update_timer_.SetRate(0);
     update_counter_ = 0;
   }
 
-  void BeforePhysicsStep(const Timekeeper& timekeeper) override {
+  void BeforePhysicsStep(const Timekeeper &timekeeper) override {
     // keeps this function updating at a specific rate
     if (!update_timer_.CheckUpdate(timekeeper)) {
       return;
@@ -83,42 +85,43 @@ class UpdateTimerTest : public ::testing::Test {
   double actual_rate;
   double wall_rate;
   double step_size;
-  double sim_test_time;
-  World* w;
+  int64_t sim_test_time;
+  World *w;
+  std::shared_ptr<rclcpp::Node> node;
+
+  UpdateTimerTest() : node(rclcpp::Node::make_shared("test_update_timer")) {}
 
   void SetUp() override {
     this_file_dir = boost::filesystem::path(__FILE__).parent_path();
     w = nullptr;
   }
 
-  void TearDown() override {
-    if (w != nullptr) {
-      delete w;
-    }
-  }
+  void TearDown() override { delete w; }
 
   void ExecuteRateTest() {
-    Timekeeper timekeeper;
-    w = World::MakeWorld(world_yaml.string());
+    Timekeeper timekeeper(node);
+    w = World::MakeWorld(node, world_yaml.string());
 
     // artificially load a plugin
-    boost::shared_ptr<TestPlugin> p(new TestPlugin());
-    p->Initialize("TestPlugin", "test_plugin", w->models_[0], YAML::Node());
+    std::shared_ptr<TestPlugin> p(new TestPlugin());
+    p->Initialize(node, "TestPlugin", "test_plugin", w->models_[0],
+                  YAML::Node());
     w->plugin_manager_.model_plugins_.push_back(p);
 
     p->update_timer_.SetRate(set_rate);
 
     timekeeper.SetMaxStepSize(step_size);
-    ros::WallRate rate(wall_rate);
+    rclcpp::WallRate rate(wall_rate);
 
     // run for two seconds
-    while (timekeeper.GetSimTime() < ros::Time(sim_test_time)) {
+    auto timeLimit = rclcpp::Time(sim_test_time, 0);
+    while (timekeeper.GetSimTime() < timeLimit) {
       w->Update(timekeeper);
-      ros::spinOnce();
+      rclcpp::spin_some(node);
       rate.sleep();
     }
 
-    actual_rate = p->update_counter_ / timekeeper.GetSimTime().toSec();
+    actual_rate = p->update_counter_ / timekeeper.GetSimTime().seconds();
 
     printf("Actual Rate: %f, Expected Rate: %f\n", actual_rate, expected_rate);
   }
@@ -215,8 +218,8 @@ TEST_F(UpdateTimerTest, rate_test_E) {
 }
 
 // Run all the tests that were declared with TEST()
-int main(int argc, char** argv) {
-  ros::init(argc, argv, "model_tf_plugin_test");
+int main(int argc, char **argv) {
+  rclcpp::init(argc, argv);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

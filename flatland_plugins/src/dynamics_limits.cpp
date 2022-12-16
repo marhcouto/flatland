@@ -48,8 +48,8 @@
 
 namespace flatland_plugins {
 
-void DynamicsLimits::Configure(const YAML::Node &config) {
-  flatland_server::YamlReader reader(config);
+void DynamicsLimits::Configure(rclcpp::Node::SharedPtr node, const YAML::Node &config) {
+  flatland_server::YamlReader reader(node, config);
   acceleration_limit_ = reader.Get<double>("acceleration_limit", 0.0);  // 0.0 default disables the limit
   deceleration_limit_ = reader.Get<double>("deceleration_limit", std::numeric_limits<double>::infinity());
 

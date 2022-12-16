@@ -49,6 +49,7 @@
 #include <flatland_server/timekeeper.h>
 #include <flatland_server/world.h>
 #include <gtest/gtest.h>
+
 #include <regex>
 
 namespace fs = boost::filesystem;
@@ -73,7 +74,7 @@ class TweenPluginTest : public ::testing::Test {
       return true;
     }
 
-    bool ret = fabs(n1 - n2) < epsilon;
+    bool ret = std::fabs(n1 - n2) < epsilon;
     return ret;
   }
 };
@@ -84,9 +85,11 @@ class TweenPluginTest : public ::testing::Test {
 TEST_F(TweenPluginTest, once_test) {
   world_yaml = this_file_dir / fs::path("tween_tests/once.world.yaml");
 
-  Timekeeper timekeeper;
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_tween_once_test");
+  Timekeeper timekeeper(node);
   timekeeper.SetMaxStepSize(0.5);
-  World* w = World::MakeWorld(world_yaml.string());
+  World* w = World::MakeWorld(node, world_yaml.string());
 
   Tween* tween =
       dynamic_cast<Tween*>(w->plugin_manager_.model_plugins_[0].get());
@@ -118,9 +121,11 @@ TEST_F(TweenPluginTest, once_test) {
 TEST_F(TweenPluginTest, yoyo_test) {
   world_yaml = this_file_dir / fs::path("tween_tests/yoyo.world.yaml");
 
-  Timekeeper timekeeper;
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_tween_yoyo_test");
+  Timekeeper timekeeper(node);
   timekeeper.SetMaxStepSize(0.5);
-  World* w = World::MakeWorld(world_yaml.string());
+  World* w = World::MakeWorld(node, world_yaml.string());
 
   Tween* tween =
       dynamic_cast<Tween*>(w->plugin_manager_.model_plugins_[0].get());
@@ -161,9 +166,11 @@ TEST_F(TweenPluginTest, yoyo_test) {
 TEST_F(TweenPluginTest, loop_test) {
   world_yaml = this_file_dir / fs::path("tween_tests/loop.world.yaml");
 
-  Timekeeper timekeeper;
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_tween_loop_test");
+  Timekeeper timekeeper(node);
   timekeeper.SetMaxStepSize(0.5);
-  World* w = World::MakeWorld(world_yaml.string());
+  World* w = World::MakeWorld(node, world_yaml.string());
 
   Tween* tween =
       dynamic_cast<Tween*>(w->plugin_manager_.model_plugins_[0].get());
@@ -201,7 +208,7 @@ TEST_F(TweenPluginTest, loop_test) {
 
 // Run all the tests that were declared with TEST()
 int main(int argc, char** argv) {
-  ros::init(argc, argv, "tween_test");
+  rclcpp::init(argc, argv);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

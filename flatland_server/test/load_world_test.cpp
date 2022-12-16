@@ -52,7 +52,9 @@
 #include <flatland_server/types.h>
 #include <flatland_server/world.h>
 #include <gtest/gtest.h>
+
 #include <boost/filesystem.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <regex>
 #include <string>
 
@@ -84,7 +86,9 @@ class LoadWorldTest : public ::testing::Test {
     std::regex regex(regex_str);
 
     try {
-      w = World::MakeWorld(world_yaml.string());
+      std::shared_ptr<rclcpp::Node> node =
+          rclcpp::Node::make_shared("test_yaml_fail_node");
+      w = World::MakeWorld(node, world_yaml.string());
       ADD_FAILURE() << "Expected an exception, but none were raised";
     } catch (const Exception &e) {
       EXPECT_TRUE(std::regex_match(e.what(), match, regex))
@@ -98,7 +102,7 @@ class LoadWorldTest : public ::testing::Test {
   }
 
   bool float_cmp(double n1, double n2) {
-    bool ret = fabs(n1 - n2) < 1e-5;
+    bool ret = std::fabs(n1 - n2) < 1e-5;
     return ret;
   }
 
@@ -134,8 +138,6 @@ class LoadWorldTest : public ::testing::Test {
       int ret_idx = does_edge_exist(e, edges_cpy);
 
       if (ret_idx < 0) {
-        b2Vec2 v1_tf = e.m_vertex1;
-        b2Vec2 v2_tf = e.m_vertex2;
         return false;
       }
 
@@ -257,7 +259,7 @@ class LoadWorldTest : public ::testing::Test {
     }
 
     b2PolygonShape *s = dynamic_cast<b2PolygonShape *>(f->GetShape());
-    int cnt = s->m_count;
+    unsigned int cnt = s->m_count;
     if (cnt != points.size()) {
       printf("Number of points Actual:%d != Expected:%lu\n", cnt,
              points.size());
@@ -270,7 +272,7 @@ class LoadWorldTest : public ::testing::Test {
       const b2Vec2 p = s->m_vertices[i];
 
       bool found_match = false;
-      int j;
+      unsigned int j;
       for (j = 0; j < pts.size(); j++) {
         if (!float_cmp(p.x, points[i].first) ||
             !float_cmp(p.y, points[i].second)) {
@@ -282,12 +284,12 @@ class LoadWorldTest : public ::testing::Test {
       if (!found_match) {
         // cannot find a matching point, print the expected and actual points
         printf("Actual: [");
-        for (int k = 0; k < cnt; k++) {
+        for (unsigned int k = 0; k < cnt; k++) {
           printf("[%f,%f],", s->m_vertices[k].x, s->m_vertices[k].y);
         }
 
         printf("] != Expected: [");
-        for (int k = 0; k < points.size(); k++) {
+        for (unsigned int k = 0; k < points.size(); k++) {
           printf("[%f,%f],", points[k].first, points[k].second);
         }
         printf("]\n");
@@ -381,13 +383,14 @@ class LoadWorldTest : public ::testing::Test {
 
     if (j->GetBodyA() != body_A->physics_body_) {
       printf("BodyA ptr Actual %p != Expected:%p\n",
-             joint->physics_joint_->GetBodyA(), body_A->physics_body_);
+             (void *)joint->physics_joint_->GetBodyA(),
+             (void *)body_A->physics_body_);
       return false;
     }
 
     if (j->GetBodyB() != body_B->physics_body_) {
-      printf("BodyB ptr Actual %p != Expected:%p\n", j->GetBodyB(),
-             body_B->physics_body_);
+      printf("BodyB ptr Actual %p != Expected:%p\n", (void *)j->GetBodyB(),
+             (void *)body_B->physics_body_);
       return false;
     }
 
@@ -516,16 +519,18 @@ class LoadWorldTest : public ::testing::Test {
 TEST_F(LoadWorldTest, simple_test_A) {
   world_yaml =
       this_file_dir / fs::path("load_world_tests/simple_test_A/world.yaml");
-  w = World::MakeWorld(world_yaml.string());
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("simple_test_A_node");
+  w = World::MakeWorld(node, world_yaml.string());
 
   EXPECT_EQ(w->physics_velocity_iterations_, 11);
   EXPECT_EQ(w->physics_position_iterations_, 12);
 
-  ASSERT_EQ(w->layers_.size(), 4);
+  ASSERT_EQ(w->layers_.size(), (unsigned int)4);
 
   // check that layer 0 settings are loaded correctly
   EXPECT_STREQ(w->layers_[0]->name_.c_str(), "2d");
-  ASSERT_EQ(w->layers_[0]->names_.size(), 1);
+  ASSERT_EQ(w->layers_[0]->names_.size(), (unsigned int)1);
   EXPECT_STREQ(w->layers_[0]->names_[0].c_str(), "2d");
   EXPECT_EQ(w->layers_[0]->Type(), Entity::EntityType::LAYER);
   EXPECT_TRUE(BodyEq(w->layers_[0]->body_, "2d", b2_staticBody,
@@ -535,7 +540,7 @@ TEST_F(LoadWorldTest, simple_test_A) {
 
   // check that layer 1 settings are loaded correctly
   EXPECT_STREQ(w->layers_[1]->name_.c_str(), "3d");
-  ASSERT_EQ(w->layers_[1]->names_.size(), 3);
+  ASSERT_EQ(w->layers_[1]->names_.size(), (unsigned int)3);
   EXPECT_STREQ(w->layers_[1]->names_[0].c_str(), "3d");
   EXPECT_STREQ(w->layers_[1]->names_[1].c_str(), "4d");
   EXPECT_STREQ(w->layers_[1]->names_[2].c_str(), "5d");
@@ -549,7 +554,7 @@ TEST_F(LoadWorldTest, simple_test_A) {
 
   // check that layer 2 settings are loaded correctly
   EXPECT_STREQ(w->layers_[2]->name_.c_str(), "lines");
-  ASSERT_EQ(w->layers_[2]->names_.size(), 1);
+  ASSERT_EQ(w->layers_[2]->names_.size(), (unsigned int)1);
   EXPECT_STREQ(w->layers_[2]->names_[0].c_str(), "lines");
   EXPECT_EQ(w->layers_[2]->Type(), Entity::EntityType::LAYER);
   EXPECT_TRUE(BodyEq(w->layers_[2]->body_, "lines", b2_staticBody,
@@ -644,14 +649,14 @@ TEST_F(LoadWorldTest, simple_test_A) {
   Model *m0 = w->models_[0];
   EXPECT_STREQ(m0->name_.c_str(), "turtlebot1");
   EXPECT_STREQ(m0->namespace_.c_str(), "");
-  ASSERT_EQ(m0->bodies_.size(), 5);
-  ASSERT_EQ(m0->joints_.size(), 4);
+  ASSERT_EQ(m0->bodies_.size(), (unsigned int)5);
+  ASSERT_EQ(m0->joints_.size(), (unsigned int)4);
 
   // check model 0 body 0
   EXPECT_TRUE(BodyEq(m0->bodies_[0], "base", b2_dynamicBody, {0, 0, 0},
                      {1, 1, 0, 0.25}, 0.1, 0.125));
   auto fs = GetBodyFixtures(m0->bodies_[0]);
-  ASSERT_EQ(fs.size(), 2);
+  ASSERT_EQ(fs.size(), (unsigned int)2);
   EXPECT_TRUE(FixtureEq(fs[0], false, 0, 0xFFFF, 0xFFFF, 0, 0, 0));
   EXPECT_TRUE(CircleEq(fs[0], 0, 0, 1.777));
   EXPECT_TRUE(FixtureEq(fs[1], false, 0, 0xFFFF, 0xFFFF, 982.24, 0.59, 0.234));
@@ -662,7 +667,7 @@ TEST_F(LoadWorldTest, simple_test_A) {
   EXPECT_TRUE(BodyEq(m0->bodies_[1], "left_wheel", b2_dynamicBody, {-1, 0, 0},
                      {1, 0, 0, 0.25}, 0, 0));
   fs = GetBodyFixtures(m0->bodies_[1]);
-  ASSERT_EQ(fs.size(), 1);
+  ASSERT_EQ(fs.size(), (unsigned int)1);
   EXPECT_TRUE(FixtureEq(fs[0], true, 0, 0b01, 0b01, 0, 0, 0));
   EXPECT_TRUE(PolygonEq(
       fs[0], {{-0.2, 0.75}, {-0.2, -0.75}, {0.2, -0.75}, {0.2, 0.75}}));
@@ -671,7 +676,7 @@ TEST_F(LoadWorldTest, simple_test_A) {
   EXPECT_TRUE(BodyEq(m0->bodies_[2], "right_wheel", b2_dynamicBody, {1, 0, 0},
                      {0, 1, 0, 0.25}, 0, 0));
   fs = GetBodyFixtures(m0->bodies_[2]);
-  ASSERT_EQ(fs.size(), 1);
+  ASSERT_EQ(fs.size(), (unsigned int)1);
   EXPECT_TRUE(FixtureEq(fs[0], false, 0, 0xFFFF, 0xFFFF, 0, 0, 0));
   EXPECT_TRUE(PolygonEq(
       fs[0], {{-0.2, 0.75}, {-0.2, -0.75}, {0.2, -0.75}, {0.2, 0.75}}));
@@ -680,7 +685,7 @@ TEST_F(LoadWorldTest, simple_test_A) {
   EXPECT_TRUE(BodyEq(m0->bodies_[3], "tail", b2_dynamicBody, {0, 0, 0.52},
                      {0, 0, 0, 0.5}, 0, 0));
   fs = GetBodyFixtures(m0->bodies_[3]);
-  ASSERT_EQ(fs.size(), 1);
+  ASSERT_EQ(fs.size(), (unsigned int)1);
   EXPECT_TRUE(FixtureEq(fs[0], false, 0, 0b10, 0b10, 0, 0, 0));
   EXPECT_TRUE(PolygonEq(fs[0], {{-0.2, 0}, {-0.2, -5}, {0.2, -5}, {0.2, 0}}));
 
@@ -688,7 +693,7 @@ TEST_F(LoadWorldTest, simple_test_A) {
   EXPECT_TRUE(BodyEq(m0->bodies_[4], "antenna", b2_dynamicBody, {0, 0.5, 0},
                      {0.2, 0.4, 0.6, 1}, 0, 0));
   fs = GetBodyFixtures(m0->bodies_[4]);
-  ASSERT_EQ(fs.size(), 1);
+  ASSERT_EQ(fs.size(), (unsigned int)1);
   EXPECT_TRUE(FixtureEq(fs[0], false, 0, 0b0, 0b0, 0, 0, 0));
   EXPECT_TRUE(CircleEq(fs[0], 0.01, 0.02, 0.25));
 
@@ -713,8 +718,8 @@ TEST_F(LoadWorldTest, simple_test_A) {
   Model *m1 = w->models_[1];
   EXPECT_STREQ(m1->name_.c_str(), "turtlebot2");
   EXPECT_STREQ(m1->namespace_.c_str(), "robot2");
-  ASSERT_EQ(m1->bodies_.size(), 5);
-  ASSERT_EQ(m1->joints_.size(), 4);
+  ASSERT_EQ(m1->bodies_.size(), (unsigned int)5);
+  ASSERT_EQ(m1->joints_.size(), (unsigned int)4);
 
   // check the applied transformation just for the first body
   EXPECT_TRUE(BodyEq(m1->bodies_[0], "base", b2_dynamicBody, {3, 4.5, 3.14159},
@@ -723,14 +728,14 @@ TEST_F(LoadWorldTest, simple_test_A) {
   // Check model 2 which is the chair
   Model *m2 = w->models_[2];
   EXPECT_STREQ(m2->name_.c_str(), "chair1");
-  ASSERT_EQ(m2->bodies_.size(), 1);
-  ASSERT_EQ(m2->joints_.size(), 0);
+  ASSERT_EQ(m2->bodies_.size(), (unsigned int)1);
+  ASSERT_EQ(m2->joints_.size(), (unsigned int)0);
 
   // Check model 2 fixtures
   EXPECT_TRUE(BodyEq(m2->bodies_[0], "chair", b2_staticBody, {1.2, 3.5, 2.123},
                      {1, 1, 1, 0.5}, 0, 0));
   fs = GetBodyFixtures(m2->bodies_[0]);
-  ASSERT_EQ(fs.size(), 2);
+  ASSERT_EQ(fs.size(), (unsigned int)2);
   EXPECT_TRUE(FixtureEq(fs[0], false, 0, 0b1100, 0b1100, 0, 0, 0));
   EXPECT_TRUE(CircleEq(fs[0], 0, 0, 1));
 
@@ -740,8 +745,8 @@ TEST_F(LoadWorldTest, simple_test_A) {
   // Check model 3 which is the chair
   Model *m3 = w->models_[3];
   EXPECT_STREQ(m3->name_.c_str(), "person1");
-  ASSERT_EQ(m3->bodies_.size(), 1);
-  ASSERT_EQ(m3->joints_.size(), 0);
+  ASSERT_EQ(m3->bodies_.size(), (unsigned int)1);
+  ASSERT_EQ(m3->joints_.size(), (unsigned int)0);
 
   // check the body only
   EXPECT_TRUE(BodyEq(m3->bodies_[0], "body", b2_kinematicBody, {0, 1, 2},
@@ -998,7 +1003,7 @@ TEST_F(LoadWorldTest, model_invalid_J) {
 
 // Run all the tests that were declared with TEST()
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "load_world_test");
+  rclcpp::init(argc, argv);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

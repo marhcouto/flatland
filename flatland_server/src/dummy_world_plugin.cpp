@@ -48,13 +48,13 @@
 #include <flatland_server/exceptions.h>
 #include <flatland_server/world_plugin.h>
 #include <flatland_server/yaml_reader.h>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 #include <yaml-cpp/yaml.h>
 using namespace flatland_server;
 
 namespace flatland_plugins {
 
-void DummyWorldPlugin::OnInitialize(const YAML::Node &config) {
+void DummyWorldPlugin::OnInitialize(const YAML::Node &plugin_reader, YamlReader &world_config) {
   if (world_ != NULL) {
     throw PluginException("World is not NULL!");
   }
@@ -71,7 +71,7 @@ void DummyWorldPlugin::OnInitialize(const YAML::Node &config) {
         type_);
   }
 }
-};
+}
 
 PLUGINLIB_EXPORT_CLASS(flatland_plugins::DummyWorldPlugin,
                        flatland_server::WorldPlugin)

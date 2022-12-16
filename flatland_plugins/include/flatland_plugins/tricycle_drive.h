@@ -49,8 +49,9 @@
 #include <flatland_plugins/dynamics_limits.h>
 #include <flatland_server/model_plugin.h>
 #include <flatland_server/timekeeper.h>
-#include <geometry_msgs/Twist.h>
-#include <nav_msgs/Odometry.h>
+#include <geometry_msgs/msg/twist.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 #include <random>
 
 #ifndef FLATLAND_PLUGINS_TRICYCLE_DRIVE_H
@@ -81,12 +82,12 @@ class TricycleDrive : public flatland_server::ModelPlugin {
   double d_delta_;        ///< The current angular speed of the front wheel
   double v_f_ = 0.0;      ///< The current velocity at the front wheel
 
-  geometry_msgs::Twist twist_msg_;
-  nav_msgs::Odometry odom_msg_;
-  nav_msgs::Odometry ground_truth_msg_;
-  ros::Subscriber twist_sub_;
-  ros::Publisher odom_pub_;
-  ros::Publisher ground_truth_pub_;
+  geometry_msgs::msg::Twist::SharedPtr twist_msg_ = std::make_shared<geometry_msgs::msg::Twist>();
+  nav_msgs::msg::Odometry odom_msg_;
+  nav_msgs::msg::Odometry ground_truth_msg_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_sub_;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr ground_truth_pub_;
 
   UpdateTimer update_timer_;
 
@@ -130,7 +131,7 @@ class TricycleDrive : public flatland_server::ModelPlugin {
   * @brief         callback to apply twist (velocity and omega)
   * @param[in]     timestep how much the physics time will increment
   */
-  void TwistCallback(const geometry_msgs::Twist& msg);
+  void TwistCallback(const geometry_msgs::msg::Twist::SharedPtr msg);
 
   /**
    * @brief     Saturates the input between the lower and upper limits

@@ -46,14 +46,16 @@
 
 #include <flatland_plugins/model_tf_publisher.h>
 #include <flatland_server/exceptions.h>
-#include <flatland_server/model_plugin.h>
 #include <flatland_server/timekeeper.h>
 #include <flatland_server/world.h>
-#include <geometry_msgs/TransformStamped.h>
 #include <gtest/gtest.h>
-#include <tf/transform_datatypes.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
+
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <regex>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 namespace fs = boost::filesystem;
 using namespace flatland_server;
@@ -70,11 +72,7 @@ class ModelTfPublisherTest : public ::testing::Test {
     w = nullptr;
   }
 
-  void TearDown() override {
-    if (w != nullptr) {
-      delete w;
-    }
-  }
+  void TearDown() override { delete w; }
 
   static bool fltcmp(const double& n1, const double& n2) {
     if (std::isinf(n1) && std::isinf(n2)) {
@@ -85,16 +83,16 @@ class ModelTfPublisherTest : public ::testing::Test {
       return true;
     }
 
-    bool ret = fabs(n1 - n2) < 1e-5;
+    bool ret = std::fabs(n1 - n2) < 1e-5;
     return ret;
   }
 
   // Test if transform equals to expected
-  bool TfEq(const geometry_msgs::TransformStamped& tf, float x, float y,
+  bool TfEq(const geometry_msgs::msg::TransformStamped& tf, float x, float y,
             float a) {
-    tf::Quaternion q;
-    tf::quaternionMsgToTF(tf.transform.rotation, q);
-    tf::Matrix3x3 rot_matrix(q);
+    tf2::Quaternion q;
+    tf2::fromMsg(tf.transform.rotation, q);
+    tf2::Matrix3x3 rot_matrix(q);
     double roll, pitch, yaw;
     rot_matrix.getRPY(roll, pitch, yaw);
 
@@ -123,46 +121,48 @@ TEST_F(ModelTfPublisherTest, tf_publish_test_A) {
       this_file_dir /
       fs::path("model_tf_publisher_tests/tf_publish_test_A/world.yaml");
 
-  Timekeeper timekeeper;
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_tf_publisher_tf_publish_test_A");
+  Timekeeper timekeeper(node);
   timekeeper.SetMaxStepSize(1.0);
-  w = World::MakeWorld(world_yaml.string());
-  ModelTfPublisher* p = dynamic_cast<ModelTfPublisher*>(
+  w = World::MakeWorld(node, world_yaml.string());
+  auto* p = dynamic_cast<ModelTfPublisher*>(
       w->plugin_manager_.model_plugins_[0].get());
 
   EXPECT_DOUBLE_EQ(5000.0, p->update_rate_);
   EXPECT_STREQ("antenna", p->reference_body_->name_.c_str());
 
-  tf2_ros::Buffer tf_buffer;
+  tf2_ros::Buffer tf_buffer(node->get_clock());
   tf2_ros::TransformListener tf_listener(tf_buffer);
-  geometry_msgs::TransformStamped tf_world_to_base;
-  geometry_msgs::TransformStamped tf_world_to_antenna;
-  geometry_msgs::TransformStamped tf_base_to_left_wheel;
-  geometry_msgs::TransformStamped tf_base_to_right_wheel;
-  geometry_msgs::TransformStamped tf_base_to_front_bumper;
-  geometry_msgs::TransformStamped tf_base_to_rear_bumper;
+  geometry_msgs::msg::TransformStamped tf_world_to_base;
+  geometry_msgs::msg::TransformStamped tf_world_to_antenna;
+  geometry_msgs::msg::TransformStamped tf_base_to_left_wheel;
+  geometry_msgs::msg::TransformStamped tf_base_to_right_wheel;
+  geometry_msgs::msg::TransformStamped tf_base_to_front_bumper;
+  geometry_msgs::msg::TransformStamped tf_base_to_rear_bumper;
 
   // let it spin for 10 times to make sure the message gets through
-  ros::WallRate rate(500);
+  rclcpp::WallRate rate(500);
   for (unsigned int i = 0; i < 100; i++) {
     w->Update(timekeeper);
-    ros::spinOnce();
+    rclcpp::spin_some(node);
     rate.sleep();
   }
 
   // check for the transformations that should exist
   tf_world_to_base =
-      tf_buffer.lookupTransform("world", "my_robot_base", ros::Time(0));
+      tf_buffer.lookupTransform("world", "my_robot_base", rclcpp::Time(0));
   tf_world_to_antenna =
-      tf_buffer.lookupTransform("world", "my_robot_antenna", ros::Time(0));
+      tf_buffer.lookupTransform("world", "my_robot_antenna", rclcpp::Time(0));
   tf_base_to_left_wheel = tf_buffer.lookupTransform(
-      "my_robot_base", "my_robot_left_wheel", ros::Time(0));
+      "my_robot_base", "my_robot_left_wheel", rclcpp::Time(0));
   tf_base_to_right_wheel = tf_buffer.lookupTransform(
-      "my_robot_base", "my_robot_right_wheel", ros::Time(0));
+      "my_robot_base", "my_robot_right_wheel", rclcpp::Time(0));
 
   // check for the transformations that should not exist
   try {
     tf_base_to_front_bumper = tf_buffer.lookupTransform(
-        "my_robot_base", "my_robot_front_bumper", ros::Time(0));
+        "my_robot_base", "my_robot_front_bumper", rclcpp::Time(0));
     ADD_FAILURE() << "Expected an exception, but none were raised";
   } catch (const tf2::TransformException& e) {
     EXPECT_STREQ(
@@ -173,7 +173,7 @@ TEST_F(ModelTfPublisherTest, tf_publish_test_A) {
 
   try {
     tf_base_to_rear_bumper = tf_buffer.lookupTransform(
-        "my_robot_base", "my_robot_rear_bumper", ros::Time(0));
+        "my_robot_base", "my_robot_rear_bumper", rclcpp::Time(0));
     ADD_FAILURE() << "Expected an exception, but none were raised";
   } catch (const tf2::TransformException& e) {
     EXPECT_STREQ(
@@ -197,45 +197,47 @@ TEST_F(ModelTfPublisherTest, tf_publish_test_B) {
       this_file_dir /
       fs::path("model_tf_publisher_tests/tf_publish_test_B/world.yaml");
 
-  Timekeeper timekeeper;
+  std::shared_ptr<rclcpp::Node> node =
+      rclcpp::Node::make_shared("test_tf_publisher_tf_publish_test_B");
+  Timekeeper timekeeper(node);
   timekeeper.SetMaxStepSize(1.0);
-  w = World::MakeWorld(world_yaml.string());
+  w = World::MakeWorld(node, world_yaml.string());
   ModelTfPublisher* p = dynamic_cast<ModelTfPublisher*>(
       w->plugin_manager_.model_plugins_[0].get());
 
   EXPECT_DOUBLE_EQ(std::numeric_limits<double>::infinity(), p->update_rate_);
   EXPECT_STREQ("base", p->reference_body_->name_.c_str());
 
-  tf2_ros::Buffer tf_buffer;
+  tf2_ros::Buffer tf_buffer(node->get_clock());
   tf2_ros::TransformListener tf_listener(tf_buffer);
-  geometry_msgs::TransformStamped tf_map_to_base;
-  geometry_msgs::TransformStamped tf_base_to_antenna;
-  geometry_msgs::TransformStamped tf_base_to_left_wheel;
-  geometry_msgs::TransformStamped tf_base_to_right_wheel;
-  geometry_msgs::TransformStamped tf_base_to_front_bumper;
-  geometry_msgs::TransformStamped tf_base_to_rear_bumper;
+  geometry_msgs::msg::TransformStamped tf_map_to_base;
+  geometry_msgs::msg::TransformStamped tf_base_to_antenna;
+  geometry_msgs::msg::TransformStamped tf_base_to_left_wheel;
+  geometry_msgs::msg::TransformStamped tf_base_to_right_wheel;
+  geometry_msgs::msg::TransformStamped tf_base_to_front_bumper;
+  geometry_msgs::msg::TransformStamped tf_base_to_rear_bumper;
 
   // let it spin for 10 times to make sure the message gets through
-  ros::WallRate rate(500);
+  rclcpp::WallRate rate(500);
   for (unsigned int i = 0; i < 100; i++) {
     w->Update(timekeeper);
-    ros::spinOnce();
+    rclcpp::spin_some(node);
     rate.sleep();
   }
 
   tf_base_to_antenna =
-      tf_buffer.lookupTransform("base", "antenna", ros::Time(0));
+      tf_buffer.lookupTransform("base", "antenna", rclcpp::Time(0));
   tf_base_to_left_wheel =
-      tf_buffer.lookupTransform("base", "left_wheel", ros::Time(0));
+      tf_buffer.lookupTransform("base", "left_wheel", rclcpp::Time(0));
   tf_base_to_right_wheel =
-      tf_buffer.lookupTransform("base", "right_wheel", ros::Time(0));
+      tf_buffer.lookupTransform("base", "right_wheel", rclcpp::Time(0));
   tf_base_to_front_bumper =
-      tf_buffer.lookupTransform("base", "front_bumper", ros::Time(0));
+      tf_buffer.lookupTransform("base", "front_bumper", rclcpp::Time(0));
   tf_base_to_rear_bumper =
-      tf_buffer.lookupTransform("base", "rear_bumper", ros::Time(0));
+      tf_buffer.lookupTransform("base", "rear_bumper", rclcpp::Time(0));
 
   try {
-    tf_map_to_base = tf_buffer.lookupTransform("map", "base", ros::Time(0));
+    tf_map_to_base = tf_buffer.lookupTransform("map", "base", rclcpp::Time(0));
     ADD_FAILURE() << "Expected an exception, but none were raised";
   } catch (const tf2::TransformException& e) {
     EXPECT_STREQ(
@@ -260,7 +262,8 @@ TEST_F(ModelTfPublisherTest, invalid_A) {
       this_file_dir / fs::path("model_tf_publisher_tests/invalid_A/world.yaml");
 
   try {
-    w = World::MakeWorld(world_yaml.string());
+    std::shared_ptr<rclcpp::Node> node = rclcpp::Node::make_shared("test_node");
+    w = World::MakeWorld(node, world_yaml.string());
 
     FAIL() << "Expected an exception, but none were raised";
   } catch (const PluginException& e) {
@@ -286,7 +289,8 @@ TEST_F(ModelTfPublisherTest, invalid_B) {
       this_file_dir / fs::path("model_tf_publisher_tests/invalid_B/world.yaml");
 
   try {
-    w = World::MakeWorld(world_yaml.string());
+    std::shared_ptr<rclcpp::Node> node = rclcpp::Node::make_shared("test_node");
+    w = World::MakeWorld(node, world_yaml.string());
 
     FAIL() << "Expected an exception, but none were raised";
   } catch (const PluginException& e) {
@@ -306,7 +310,7 @@ TEST_F(ModelTfPublisherTest, invalid_B) {
 
 // Run all the tests that were declared with TEST()
 int main(int argc, char** argv) {
-  ros::init(argc, argv, "model_tf_plugin_test");
+  rclcpp::init(argc, argv);
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
