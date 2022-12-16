@@ -18,7 +18,8 @@ writing.
 
 1. Install [git](https://git-scm.com)
 2. `git clone` this repository into your project's workspace's `src` folder
-3. Install the required dependencies using
+3. Install ROS 2 humble following [this](https://docs.ros.org/en/humble/Installation.html) instalation guide
+4. Install the required dependencies using
    `rosdep install -i --from-path src --rosdistro humble -y`
 
 ### Do you have any working example?
