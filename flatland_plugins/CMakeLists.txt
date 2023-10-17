@@ -62,6 +62,7 @@ add_library(flatland_plugins_lib SHARED
   src/laser.cpp
   src/tricycle_drive.cpp
   src/diff_drive.cpp
+  src/diff_drive2.cpp
   src/dynamics_limits.cpp
   src/model_tf_publisher.cpp
   src/update_timer.cpp
